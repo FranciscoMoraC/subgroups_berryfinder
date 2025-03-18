@@ -292,7 +292,7 @@ class BerryFinder(Algorithm):
         """
         # Set of selector indexes that the pattern contains.
         selector_indexes = {self._selectors.index(selector) for selector in pattern}
-        # Patterns refined by the new pattern, starting with the root
+        # Patterns that refine the new pattern, initially only the root node.
         refined = {self._root_node}
         # New node to be added to the graph
         new_node = BFinderNode(selector_indexes,rank)
