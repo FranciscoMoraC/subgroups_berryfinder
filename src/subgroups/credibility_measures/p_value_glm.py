@@ -18,12 +18,19 @@ class PValueGLM(CredibilityMeasure):
     """
 
     _singleton = None
-    __slots__ = ()
+    __slots__ = ("_threshold",)
 
-    def __new__(cls) -> 'PValueGLM':
+    def __new__(cls, threshold: float = None) -> 'PValueGLM':
         if PValueGLM._singleton is None:
             PValueGLM._singleton = object().__new__(cls)
         return PValueGLM._singleton
+    
+    def __init__(self, threshold: float = None) -> None:
+        """Constructor of the class PValueGLM.
+
+        :param threshold: threshold for the credibility measure (default: None).
+        """
+        self._threshold = threshold
     
     def compute(self, dict_of_parameters: dict[str, int | float]) -> float:
         """Method to compute the significance credibility measure using the generalized linear model (you can also call to the instance for this purpose).
@@ -50,10 +57,12 @@ class PValueGLM(CredibilityMeasure):
         """
         return "PValueGLM"
     
-    def __call__(self, dict_of_parameters: dict[str, int | float]) -> float:
-        """Method to compute the significance credibility measure using the generalized linear model (you can also call to the instance for this purpose).
+    def __call__(self, dict_of_parameters: dict[str, int | float]) -> bool:
+        """Method to compute the significance credibility measure using the generalized linear model (you can also call to the instance for this purpose) and checks if it meets the threshold.
 
         :param dict_of_parameters: python dictionary which contains all the necessary parameters used to compute this credibility measure.
-        :return: the computed value for the p value credibility measure.
+        :return: True if the credibility measure meets the threshold, False otherwise.
         """
-        return self.compute(dict_of_parameters)
+        if self._threshold is None:
+            raise ValueError("The threshold for the p value credibility measure is not set.")
+        return self.compute(dict_of_parameters) <= self._threshold

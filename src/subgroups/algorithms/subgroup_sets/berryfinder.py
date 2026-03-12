@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Contributors:
+#    Francisco Mora-Caselles: <fmora@um.es>
 
 """This file contains the implementation of BerryFinder
 """
@@ -14,8 +15,8 @@ from subgroups.core.pattern import Pattern
 from subgroups.core.operator import Operator
 from subgroups.core.selector import Selector
 from subgroups.core.subgroup import Subgroup
-from subgroups.quality_measures.coverage import Coverage
-from subgroups.quality_measures.ppv import PPV
+from subgroups.credibility_measures.coverage import Coverage
+from subgroups.credibility_measures.ppv import PPV
 from subgroups.credibility_measures.odds_ratio_stat import OddsRatioStatistic
 from subgroups.credibility_measures.p_value_independence import PValueIndependence
 from subgroups.credibility_measures.selector_contribution import SelectorContribution
@@ -32,7 +33,7 @@ class BerryFinder(Algorithm):
     :param coverage_thld: the minimum coverage threshold.
     :param ppv_thld: the minimum positive predictive value threshold.
     :param or_thld: the minimum odds ratio threshold.
-    :param p_val_thld: the maximum p-value threshold.
+    :param p_val_thld: the maximum p-value threshold. If None, use LORD control to determine the p-value threshold for each pattern. Default: None.
     :param abs_contribution_thld: the minimum absolute contribution threshold.
     :param contribution_thld: the maximum contribution ratio threshold.
     :param write_results_in_file: a boolean which indicates if the results are written in a file.
@@ -40,18 +41,9 @@ class BerryFinder(Algorithm):
     :param min_rank: the minimum rank of the pattern to be credible.
     """
 
-    _credibility_criterions = {
-        "coverage" :  operator.ge,
-        "odds_ratio" : operator.ge,
-        "p_value" : operator.le,
-        "ppv" : operator.ge,
-        "absolute_contribution" : operator.ge,
-        "contribution_ratio" : operator.le,
-    }
+    __slots__ = ['_cats', '_file', '_visited_subgroups', '_max_complexity', '_selected_subgroups', '_pruned_subgroups', '_credible_subgroups', '_selectors', '_thresholds','_file_path','_TP','_FP','_N','_min_rank','_entry_template','_selector_appearances','_odds_ratio_measure','_p_value_measure','_selector_contribution_measure','_coverage_measure', '_ppv_measure','_credibility_measures','_root_node']
 
-    __slots__ = ['_cats', '_file', '_visited_subgroups', '_max_complexity', '_selected_subgroups', '_pruned_subgroups', '_credible_subgroups', '_selectors', '_thresholds','_file_path','_TP','_FP','_N','_min_rank','_entry_template','_selector_appearances','_odds_ratio_measure','_p_value_measure','_selector_contribution_measure','_coverage_measure', '_ppv_measure','_root_node']
-
-    def __init__(self, cats : int = -1, max_complexity: int = -1, coverage_thld: float = 0.1, ppv_thld = 0.6, or_thld: float = 1.2, p_val_thld: float = 0.05, abs_contribution_thld: float = 0.2, contribution_thld: float = 5, write_results_in_file: bool = False, file_path: Union[str,None] = None, min_rank : int = 1) -> None:
+    def __init__(self, cats : int = -1, max_complexity: int = -1, coverage_thld: float = 0.1, ppv_thld = 0.6, or_thld: float = 1.2, p_val_thld: float = None, abs_contribution_thld: float = 0.2, contribution_thld: float = 5, write_results_in_file: bool = False, file_path: Union[str,None] = None, min_rank : int = 1) -> None:
         if type(cats) is not int:
             raise TypeError("The type of the parameter 'cats' must be 'int'.")
         if type(max_complexity) is not int:
@@ -62,8 +54,8 @@ class BerryFinder(Algorithm):
             raise TypeError("The type of the parameter 'ppv_thld' must be 'float'.")
         if type(or_thld) is not float and type(or_thld) is not int:
             raise TypeError("The type of the parameter 'or_thld' must be 'float'.")
-        if type(p_val_thld) is not float and type(p_val_thld) is not int:
-            raise TypeError("The type of the parameter 'p_val_thld' must be 'float'.")
+        if (p_val_thld is not None) and (type(p_val_thld) is not float):
+            raise TypeError("The type of the parameter 'p_val_thld' must be 'float' or 'NoneType'")
         if type(abs_contribution_thld) is not float and type(abs_contribution_thld) is not int:
             raise TypeError("The type of the parameter 'abs_contribution_thld' must be 'float'.")
         if type(contribution_thld) is not float and type(contribution_thld) is not int:
@@ -83,7 +75,7 @@ class BerryFinder(Algorithm):
             raise InconsistentMethodParametersError("The parameter 'ppv_thld' must be between 0 and 1.")
         if (or_thld < 0):
             raise InconsistentMethodParametersError("The parameter 'or_thld' must be greater than or equal to 0.")
-        if (p_val_thld < 0 or p_val_thld > 1):
+        if (p_val_thld is not None) and (p_val_thld < 0 or p_val_thld > 1):
             raise InconsistentMethodParametersError("The parameter 'p_val_thld' must be between 0 and 1.")
         if (abs_contribution_thld < 0):
             raise InconsistentMethodParametersError("The parameter 'abs_contribution_thld' must be greater than or equal to 0.")
@@ -92,8 +84,6 @@ class BerryFinder(Algorithm):
         # If 'write_results_in_file' is True, 'file_path' must not be None.
         if (write_results_in_file) and (file_path is None):
             raise ValueError("If the parameter 'write_results_in_file' is True, the parameter 'file_path' must not be None.")
-        if min_rank < 0 or min_rank > len(BerryFinder._credibility_criterions):
-            raise InconsistentMethodParametersError("The parameter 'min_rank' must be between 0 and the number of credibility measures ("+ str(len(BerryFinder._credibility_criterions))+").")
         self._visited_subgroups = 0
         self._selected_subgroups = 0
         self._pruned_subgroups = 0
@@ -106,24 +96,35 @@ class BerryFinder(Algorithm):
             self._file_path = None
         self._file = None
         self._selectors = []
-        # Thresholds for each credibility measure.
-        self._thresholds = {
-            "coverage" : coverage_thld,
-            "odds_ratio" : or_thld,
-            "p_value" : p_val_thld,
-            "ppv" : ppv_thld,
-            "absolute_contribution" : abs_contribution_thld,
-            "contribution_ratio" : contribution_thld,
-        }
         self._min_rank = min_rank
         # Dictionary used to save the appearance of each selector in the dataset.
         self._selector_appearances = dict()
         # We initialize the credibility measures objects.
-        self._coverage_measure = Coverage()
-        self._ppv_measure = PPV()
-        self._odds_ratio_measure = OddsRatioStatistic()
-        self._p_value_measure = PValueIndependence()
-        self._selector_contribution_measure = SelectorContribution()
+        self._coverage_measure = Coverage(threshold = coverage_thld)
+        self._ppv_measure = PPV(threshold = ppv_thld)
+        self._odds_ratio_measure = OddsRatioStatistic(threshold = or_thld)
+        if p_val_thld is not None:
+            self._p_value_measure = PValueIndependence(threshold = p_val_thld, lord_control=False)
+        else:
+            self._p_value_measure = PValueIndependence(lord_control=True)
+        self._selector_contribution_measure = SelectorContribution(threshold = (abs_contribution_thld, contribution_thld))
+        self._credibility_measures = [
+            ("coverage", self._coverage_measure),
+            ("ppv", self._ppv_measure),
+            ("odds_ratio", self._odds_ratio_measure),
+            ("p_value", self._p_value_measure),
+            ("selector_contribution", self._selector_contribution_measure)
+        ]
+        self._thresholds = {
+            "coverage": coverage_thld,
+            "ppv": ppv_thld,
+            "odds_ratio": or_thld,
+            "p_value": p_val_thld,
+            "absolute_contribution": abs_contribution_thld,
+            "contribution_ratio": contribution_thld
+        }
+        if min_rank < 0 or min_rank > len(self._thresholds):
+            raise InconsistentMethodParametersError("The parameter 'min_rank' must be between 0 and the number of credibility measures ("+ str(len(self._thresholds))+").")
 
     def _get_selected_subgroups(self) -> int:
         return self._selected_subgroups
@@ -205,7 +206,7 @@ class BerryFinder(Algorithm):
                     # We compute the rank of the selector.
                     rank = self._handle_individual_result(target_appearance, sel_as_pattern, appearance)
                     # If the rank of the selector is the maximum possible rank, we add this selector to the list of selectors with the maximum rank.
-                    if rank == len(BerryFinder._credibility_criterions):
+                    if rank == len(self._thresholds):
                         max_rank_selectors.append(sel)
                     else:
                         other_selectors.append(sel)
@@ -232,42 +233,26 @@ class BerryFinder(Algorithm):
             "odds_ratio" : {"tp": tp, "fp": fp, "TP": self._TP, "FP": self._FP},
             "p_value" : {"tp": tp, "fp": fp, "TP": self._TP, "FP": self._FP},
             "ppv" : {"tp": tp, "fp": fp},
-            "contributions" : {"pattern": pattern, "target_appearance": target_column, "selector_appearances": self._selector_appearances,
-                               "odds_ratio_definition": "statistic", "absolute_contribution_threshold": self._thresholds["absolute_contribution"]},
+            "selector_contribution" : {"pattern": pattern, "target_appearance": target_column, "selector_appearances": self._selector_appearances,
+                               "odds_ratio_definition": "statistic", "absolute_contribution_threshold": self._thresholds["absolute_contribution"]}
         }
         # If the credibility measure does not meet the threshold, we do not compute the rest of the credibility measures.
         # We store the credibility values in a dictionary and initialize them as the worst possible values.
-        credibility_values = {
-            "coverage": -inf,
-            "odds_ratio": -inf,
-            "p_value": inf,
-            "ppv": -inf,
-            "absolute_contribution": -inf,
-            "contribution_ratio": inf
-        }
-        for cred in credibility_parameters:
-            if cred != "contributions":
-                measure_value = getattr(self,"_" + cred + "_measure").compute(credibility_parameters[cred])
-                credibility_values[cred] = measure_value
-                # If the credibility measure does not meet the threshold, we do not need to compute the rest of the credibility measures.
-                # This is because the rank is computed as the number of consecutive True values in the credibility list.
-                if not BerryFinder._credibility_criterions[cred](credibility_values[cred],self._thresholds[cred]):
-                    break
-            # Contribution measures are computed both at the same time and at the last iteration.
-            else:
-                absolute_contribution, contribution_ratio = self._selector_contribution_measure.compute(credibility_parameters[cred])
-                credibility_values["absolute_contribution"] = absolute_contribution
-                credibility_values["contribution_ratio"] = contribution_ratio
-        # The credibility of a patterns is represented as a list of booleans,
-        # where each element is True if the credibility measure meets the threshold and False otherwise.
         credibility = []
-        for cred in BerryFinder._credibility_criterions:
-            # The credibility_criterions dictionary contains the function to compare the credibility measure with the threshold.
-            # The dictionaries credibility_values, thresholds and credibility_criterions have the same keys (the credibility measures).
-            credibility.append(BerryFinder._credibility_criterions[cred](credibility_values[cred],self._thresholds[cred]))
+        for (cred_name, measure) in self._credibility_measures:
+            if cred_name != "selector_contribution":
+                measure_is_met = measure(credibility_parameters[cred_name])
+                if not measure_is_met:
+                    break
+                credibility.append(True)
+            else:
+                contribution_is_met = measure(credibility_parameters[cred_name])
+                credibility.append(contribution_is_met[0])
+                credibility.append(contribution_is_met[1])
+                if not contribution_is_met[0] or not contribution_is_met[1]:
+                    break
         # We compute the numerical rank of the pattern given its credibility.
         return self._compute_rank(credibility)
-
     
     def _compute_rank(self,credibility: list) -> int:
         """Method to compute the rank of a pattern.
@@ -290,6 +275,8 @@ class BerryFinder(Algorithm):
         :param pattern: the pattern to be added.
         :param rank: the rank of the pattern.
         """
+        # Update the number of credible subgroups.
+        self._credible_subgroups += 1
         # Set of selector indexes that the pattern contains.
         selector_indexes = {self._selectors.index(selector) for selector in pattern}
         # Patterns that refine the new pattern, initially only the root node.
@@ -336,7 +323,7 @@ class BerryFinder(Algorithm):
         # We evaluate the pattern and compute its rank.
         rank = self._handle_individual_result(df[tuple_target_attribute_value[0]] == tuple_target_attribute_value[1], pattern, pattern_appearance)
         # If the rank of the pattern is the maximum possible rank, we add this pattern to the graph and prune this branch, since all the descendants of this pattern will be discarded when checking redundancies.
-        if rank == len(BerryFinder._credibility_criterions):
+        if rank == len(self._thresholds):
             self._add_to_graph(pattern, rank)
             return
         # If we have not pruned the branch and we have not reached the maximum depth, we continue growing the tree.
@@ -351,8 +338,6 @@ class BerryFinder(Algorithm):
                 self._grow_tree(df, tuple_target_attribute_value, selectors[i+1:], new_pattern, new_pattern_appearance)
         # We only add the pattern to the graph if it meets the minimum rank threshold.
         if rank >= self._min_rank:
-            # Update the number of credible subgroups.
-            self._credible_subgroups += 1
             # We add the pattern to the graph of subgroups.
             self._add_to_graph(pattern, rank)
 

@@ -72,14 +72,14 @@ class Bitset_QFinder(object):
         # We create models to calculate the odds ratios and p-values for each pattern
         for pattern in self._df.columns:
             results = sm.GLM(target_column, self._df[pattern], family=sm.families.Binomial()).fit()
-            odds_ratios[pattern] = odds_ratio_measure({"glm": results})
-            p_values[pattern] = p_value_measure({"glm": results})
+            odds_ratios[pattern] = odds_ratio_measure.compute({"glm": results})
+            p_values[pattern] = p_value_measure.compute({"glm": results})
             coverages[pattern] = len(self._df[self._df[pattern]])/(self._TP + self._FP)
         # We calculate the absolute contribution and the contribution ratio for each pattern
         contribution_measures = SelectorContribution()
         for pattern_as_str in self._df.columns:
             pattern = Pattern.generate_from_str(pattern_as_str)
-            absolute_contribution, contribution_ratio = contribution_measures({"odds_ratios": odds_ratios, "pattern": pattern, "odds_ratio_definition": "glm"})
+            absolute_contribution, contribution_ratio = contribution_measures.compute({"odds_ratios": odds_ratios, "pattern": pattern, "odds_ratio_definition": "glm"})
             absolute_contributions[pattern_as_str] = absolute_contribution
             contribution_ratios[pattern_as_str] = contribution_ratio
         # We use the Bonferroni correction for adjusted corrected p-values: each p_value is multiplied by the number of predictors

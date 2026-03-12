@@ -22,13 +22,19 @@ class SelectorContribution(CredibilityMeasure):
     """
 
     _singleton = None
-    __slots__ = ()
+    __slots__ = ("_threshold")
 
-    def __new__(cls) -> 'SelectorContribution':
+    def __new__(cls, threshold: tuple[float, float] = None) -> 'SelectorContribution':
         if SelectorContribution._singleton is None:
             SelectorContribution._singleton = object().__new__(cls)
         return SelectorContribution._singleton
     
+    def __init__(self, threshold: tuple[float, float] = None) -> None:
+        """Constructor of the class SelectorContribution.
+
+        :param threshold: threshold for the credibility measures (default: None).
+        """
+        self._threshold = threshold
     def compute(self, dict_of_parameters: dict[str, int | float]) -> tuple[float, float]:
         """Method to compute the absolute contribution and contribution ratio credibility measures (you can also call to the instance for this purpose).
 
@@ -86,7 +92,7 @@ class SelectorContribution(CredibilityMeasure):
             for selector in pattern:
                 pattern_appearance &= selector_appearances[selector]
             # Compute the odds ratio of the pattern using the definition provided.
-            odds_ratio = odds_ratio_measure({"appearance": pattern_appearance, "target_appearance": target_appearance})
+            odds_ratio = odds_ratio_measure.compute({"appearance": pattern_appearance, "target_appearance": target_appearance})
         # Compute the absolute contribution of each selector in the pattern.
         for selector in pattern:
             # Compute the pattern without the selector.
@@ -100,7 +106,7 @@ class SelectorContribution(CredibilityMeasure):
                 pattern_without_selector_appearance = Series(True, index = instances_index)
                 for selector in pattern_without_selector:
                     pattern_without_selector_appearance &= selector_appearances[selector]
-                pattern_without_selector_odds_ratio = odds_ratio_measure({"appearance": pattern_without_selector_appearance, "target_appearance": target_appearance})
+                pattern_without_selector_odds_ratio = odds_ratio_measure.compute({"appearance": pattern_without_selector_appearance, "target_appearance": target_appearance})
             # Compute the absolute contribution with the odds ratio of the pattern without the selector.
             contribution = odds_ratio - pattern_without_selector_odds_ratio
             # If the minimum absolute contribution threshold is provided and it is not reached, we do not need to compute the rest of the contributions,
@@ -126,9 +132,14 @@ class SelectorContribution(CredibilityMeasure):
         return "SelectorContribution"
     
     def __call__(self, dict_of_parameters: dict[str, int | float]) -> tuple[float, float]:
-        """Compute the absolute contribution and contribution ratio credibility measures.
+        """Compute the absolute contribution and contribution ratio credibility measures (you can also call to the instance for this purpose) and checks if the absolute contribution meets the threshold.
+        :param dict_of_parameters: python dictionary which contains all the necessary parameters used to compute these credibility measures.
+        :return: a tuple with two boolean values, the first one is True if the absolute contribution meets the threshold, False otherwise, and the second one is True if the contribution ratio meets the threshold, False otherwise.
         """
-        return self.compute(dict_of_parameters)
+        if self._threshold is None:
+            raise ValueError("The threshold for the selector contribution credibility measure is not set.")
+        absolute_contribution, contribution_ratio = self.compute(dict_of_parameters)
+        return absolute_contribution >= self._threshold[0], contribution_ratio <= self._threshold[1]
 
         
 

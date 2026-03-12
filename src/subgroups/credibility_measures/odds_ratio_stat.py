@@ -18,12 +18,22 @@ class OddsRatioStatistic(CredibilityMeasure):
     """
 
     _singleton = None
-    __slots__ = ()
+    __slots__ = ("_threshold","_initialized")
 
-    def __new__(cls) -> 'OddsRatioStatistic':
+    def __new__(cls, threshold: float = None) -> 'OddsRatioStatistic':
         if OddsRatioStatistic._singleton is None:
             OddsRatioStatistic._singleton = object().__new__(cls)
         return OddsRatioStatistic._singleton
+    
+    def __init__(self, threshold: float = None) -> None:
+        """Constructor of the class OddsRatioStatistic.
+
+        :param threshold: threshold for the credibility measure (default: None).
+        """
+        if getattr(self, "_initialized", False):
+            return
+        self._threshold = threshold
+        self._initialized = True
     
     def compute(self, dict_of_parameters: dict[str, int | float]) -> float:
         """Method to compute the odds ratio credibility measure using the contingency table (you can also call to the instance for this purpose).
@@ -73,7 +83,11 @@ class OddsRatioStatistic(CredibilityMeasure):
         """
         return "OddsRatioStatistic"
     
-    def __call__(self, dict_of_parameters: dict[str, int | float]) -> float:
+    def __call__(self, dict_of_parameters: dict[str, int | float]) -> bool:
         """Compute the odds ratio credibility measure using the contingency table.
+        :param dict_of_parameters: python dictionary which contains all the necessary parameters used to compute this credibility measure.
+        :return: True if the credibility measure meets the threshold, False otherwise.
         """
-        return self.compute(dict_of_parameters)
+        if self._threshold is None:
+            raise ValueError("The threshold for the odds ratio credibility measure is not set.")
+        return self.compute(dict_of_parameters) >= self._threshold

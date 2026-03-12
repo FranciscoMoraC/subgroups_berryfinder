@@ -19,12 +19,19 @@ class OddsRatioGLM(CredibilityMeasure):
     """
 
     _singleton = None
-    __slots__ = ()
+    __slots__ = ("_threshold",)
 
-    def __new__(cls) -> 'OddsRatioGLM':
+    def __new__(cls, threshold: float = None) -> 'OddsRatioGLM':
         if OddsRatioGLM._singleton is None:
             OddsRatioGLM._singleton = object().__new__(cls)
         return OddsRatioGLM._singleton
+    
+    def __init__(self, threshold: float = None) -> None:
+        """Constructor of the class OddsRatioGLM.
+
+        :param threshold: threshold for the credibility measure (default: None).
+        """
+        self._threshold = threshold
     
     def compute(self, dict_of_parameters: dict[str, int | float]) -> float:
         """Method to compute the odds ratio credibility measure using the generalized linear model (you can also call to the instance for this purpose).
@@ -51,10 +58,12 @@ class OddsRatioGLM(CredibilityMeasure):
         """
         return "OddsRatioGLM"
     
-    def __call__(self, dict_of_parameters: dict[str, int | float]) -> float:
+    def __call__(self, dict_of_parameters: dict[str, int | float]) -> bool:
         """Method to compute the odds ratio credibility measure using the generalized linear model (you can also call to the instance for this purpose).
 
         :param dict_of_parameters: python dictionary which contains all the necessary parameters used to compute this credibility measure.
-        :return: the computed value for the odds ratio credibility measure.
+        :return: True if the credibility measure meets the threshold, False otherwise.
         """
-        return self.compute(dict_of_parameters)
+        if self._threshold is None:
+            raise ValueError("The threshold for the odds ratio credibility measure is not set.")
+        return self.compute(dict_of_parameters) >= self._threshold

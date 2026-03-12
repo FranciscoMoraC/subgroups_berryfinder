@@ -7,6 +7,7 @@
 """
 
 from subgroups.credibility_measures.credibility_measure import CredibilityMeasure
+from subgroups.credibility_measures.lord_fdr_control import LordFDRControl
 from subgroups.exceptions import ParameterNotFoundError
 from math import sqrt
 from scipy.stats import norm
@@ -19,12 +20,26 @@ class PValueIndependence(CredibilityMeasure):
     """
 
     _singleton = None
-    __slots__ = ()
+    __slots__ = ("_threshold", "_lord_control")
 
-    def __new__(cls) -> 'PValueIndependence':
+    def __new__(cls, threshold: float = None, lord_control: bool = False, w0 : float  = 0.025, b0 : float = 0.025) -> 'PValueIndependence':
         if PValueIndependence._singleton is None:
             PValueIndependence._singleton = object().__new__(cls)
         return PValueIndependence._singleton
+    
+    def __init__(self, threshold: float = None, lord_control: bool = False, w0 : float  = 0.025, b0 : float = 0.025) -> None:
+        """Constructor of the class PValueIndependence.
+
+        :param threshold: threshold for the credibility measure (default: None).
+        :param lord_control: boolean value to indicate whether the credibility measure is used for LORD FDR control (default: False).
+        :param w0: initial weight for LORD FDR control (default: 0.025).
+        :param b0: initial budget for LORD FDR control (default: 0.025).
+        """
+        if lord_control:
+            self._lord_control = LordFDRControl(w0, b0)
+        else:
+            self._lord_control = None
+        self._threshold = threshold
     
     def compute(self, dict_of_parameters: dict[str, int | float]) -> float:
         """Method to compute the significance credibility measure using statistical independece hypothesis test (you can also call to the instance for this purpose).
@@ -65,9 +80,16 @@ class PValueIndependence(CredibilityMeasure):
         return "PValueIndependence"
     
     def __call__(self, dict_of_parameters: dict[str, int | float]) -> float:
-        """Method to compute the significance credibility measure using statistical independece hypothesis test (you can also call to the instance for this purpose).
+        """Method to compute the significance credibility measure using statistical independece hypothesis test (you can also call to the instance for this purpose) and checks if it meets the threshold.
 
         :param dict_of_parameters: python dictionary which contains all the necessary parameters used to compute this credibility measure.
         :return: the computed value for the p value credibility measure.
         """
-        return self.compute(dict_of_parameters)
+        if self._threshold is None and self._lord_control is None:
+            raise ValueError("The threshold for the p value credibility measure is not set and the LORD FDR control is not enabled.")
+        if self._lord_control is None:
+            return self.compute(dict_of_parameters) <= self._threshold
+        p_value = self.compute(dict_of_parameters)
+        threshold = self._lord_control.get_threshold()
+        self._lord_control.rejection(p_value <= threshold)
+        return p_value <= threshold

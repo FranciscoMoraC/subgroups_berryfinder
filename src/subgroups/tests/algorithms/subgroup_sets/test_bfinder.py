@@ -279,7 +279,7 @@ class TestQFinder(unittest.TestCase):
         model = BerryFinder(
                         coverage_thld=0,
                         or_thld=0,
-                        p_val_thld=1,
+                        p_val_thld=1.0,
                         abs_contribution_thld=0,
                         contribution_thld=inf,
                         min_rank=0,

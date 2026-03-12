@@ -33,10 +33,10 @@ class CredibilityMeasure(ABC):
         raise NotImplementedError("The 'get_name' method from the 'CredibilityMeasure' abstract class is an abstract method.")
     
     @abstractmethod
-    def __call__(self, dict_of_parameters : dict[str, Union[int, float]]) -> float:
-        """Compute the corresponding credibility measure.
+    def __call__(self, dict_of_parameters : dict[str, Union[int, float]]) -> bool:
+        """Compute the corresponding credibility measure and checks if it meets the threshold.
 
         :param dict_of_parameters: python dictionary which contains all the necessary parameters used to compute this credibility measure.
-        :return: the computed value for the corresponding credibility measure.
+        :return: True if the credibility measure meets the threshold, False otherwise.
         """
         raise NotImplementedError("The '__call__' method from the 'CredibilityMeasure' abstract class is an abstract method.")
