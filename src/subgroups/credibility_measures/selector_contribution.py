@@ -10,7 +10,6 @@ from subgroups.credibility_measures.credibility_measure import CredibilityMeasur
 from subgroups.credibility_measures.odds_ratio_stat import OddsRatioStatistic
 from subgroups.credibility_measures.odds_ratio_glm import OddsRatioGLM
 from subgroups.exceptions import ParameterNotFoundError
-import statsmodels.api as sm
 from pandas import Series
 from math import inf
 

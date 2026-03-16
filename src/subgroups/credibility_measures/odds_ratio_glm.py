@@ -8,7 +8,7 @@
 
 from subgroups.credibility_measures.credibility_measure import CredibilityMeasure
 from subgroups.exceptions import ParameterNotFoundError
-import statsmodels.api as sm
+from statsmodels.api import GLM
 from numpy import exp
 
 # Python annotations.
@@ -50,7 +50,7 @@ class OddsRatioGLM(CredibilityMeasure):
             glm = dict_of_parameters["glm"]
             return exp(glm.params.iloc[0])
         # We fit the generalized linear model and return the odds ratio as the exponential of the coefficient.
-        results = sm.GLM(dict_of_parameters["target_appearance"], dict_of_parameters["appearance"], family=sm.families.Binomial()).fit()
+        results = GLM(dict_of_parameters["target_appearance"], dict_of_parameters["appearance"], family=GLM.families.Binomial()).fit()
         return exp(results.params.iloc[0])
 
     def get_name(self) -> str:

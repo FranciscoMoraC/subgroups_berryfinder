@@ -16,7 +16,8 @@ from subgroups.core.selector import Selector
 from subgroups.core.pattern import Pattern
 from subgroups.core.operator import Operator
 from pandas import Series
-import statsmodels.api as sm
+from statsmodels.api import GLM
+from statsmodels.genmod.families.family import Binomial
 import unittest
 
 class TestCredibilityMeasures(unittest.TestCase):
@@ -109,7 +110,7 @@ class TestCredibilityMeasures(unittest.TestCase):
             p_value_glm.compute({"appearance": 1})
         pattern = Series([0,0,1,1,0,1])
         target = Series([1,0,1,1,1,0])
-        glm = sm.GLM(target, pattern, family=sm.families.Binomial()).fit()
+        glm = GLM(target, pattern, family=Binomial()).fit()
         self.assertEqual(round(p_value_glm.compute({"appearance": pattern, "target_appearance": target}),2), 0.57)
         self.assertEqual(round(p_value_glm.compute({"glm": glm}),2), 0.57)
 

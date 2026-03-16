@@ -8,7 +8,7 @@
 
 from subgroups.credibility_measures.credibility_measure import CredibilityMeasure
 from subgroups.exceptions import ParameterNotFoundError
-import statsmodels.api as sm
+from statsmodels.api import GLM
 
 # Python annotations.
 from typing import Union
@@ -49,7 +49,7 @@ class PValueGLM(CredibilityMeasure):
             glm = dict_of_parameters["glm"]
             return glm.pvalues.iloc[0]
         # Otherwise, we compute the generalized linear model and extract the p value from it.
-        results = sm.GLM(dict_of_parameters["target_appearance"], dict_of_parameters["appearance"], family=sm.families.Binomial()).fit()
+        results = GLM(dict_of_parameters["target_appearance"], dict_of_parameters["appearance"], family=GLM.families.Binomial()).fit()
         return results.pvalues.iloc[0]
 
     def get_name(self) -> str:

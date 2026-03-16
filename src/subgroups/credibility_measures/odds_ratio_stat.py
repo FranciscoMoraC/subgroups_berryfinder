@@ -23,6 +23,8 @@ class OddsRatioStatistic(CredibilityMeasure):
     def __new__(cls, threshold: float = None) -> 'OddsRatioStatistic':
         if OddsRatioStatistic._singleton is None:
             OddsRatioStatistic._singleton = object().__new__(cls)
+        elif threshold is not None:
+            OddsRatioStatistic._singleton._threshold = threshold
         return OddsRatioStatistic._singleton
     
     def __init__(self, threshold: float = None) -> None:
@@ -88,6 +90,9 @@ class OddsRatioStatistic(CredibilityMeasure):
         :param dict_of_parameters: python dictionary which contains all the necessary parameters used to compute this credibility measure.
         :return: True if the credibility measure meets the threshold, False otherwise.
         """
+        # print("Computing odds ratio with threshold", self._threshold, "and value ", self.compute(dict_of_parameters))
+        if self._threshold == 0 and self.compute(dict_of_parameters) == 0:
+            print("0,0 case. Rv is", self.compute(dict_of_parameters) >= self._threshold) 
         if self._threshold is None:
             raise ValueError("The threshold for the odds ratio credibility measure is not set.")
         return self.compute(dict_of_parameters) >= self._threshold

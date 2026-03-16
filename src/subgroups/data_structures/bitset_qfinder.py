@@ -8,10 +8,11 @@
 
 from pandas import DataFrame
 
-import statsmodels.api as sm
 from subgroups.credibility_measures.selector_contribution import SelectorContribution
 from subgroups.credibility_measures.odds_ratio_glm import OddsRatioGLM
 from subgroups.credibility_measures.p_value_glm import PValueGLM
+from statsmodels.api import GLM
+from statsmodels.genmod.families.family import Binomial
 
 from subgroups.core.pattern import Pattern
 
@@ -71,7 +72,7 @@ class Bitset_QFinder(object):
         p_value_measure = PValueGLM()
         # We create models to calculate the odds ratios and p-values for each pattern
         for pattern in self._df.columns:
-            results = sm.GLM(target_column, self._df[pattern], family=sm.families.Binomial()).fit()
+            results = GLM(target_column, self._df[pattern], family=Binomial()).fit()
             odds_ratios[pattern] = odds_ratio_measure.compute({"glm": results})
             p_values[pattern] = p_value_measure.compute({"glm": results})
             coverages[pattern] = len(self._df[self._df[pattern]])/(self._TP + self._FP)
